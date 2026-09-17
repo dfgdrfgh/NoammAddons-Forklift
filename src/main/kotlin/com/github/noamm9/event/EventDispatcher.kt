@@ -32,12 +32,9 @@ object EventDispatcher: ISelfInit, Shortcuts {
     private var invItems: MutableMap<Int, ItemStack>? = null
 
     override fun init() {
-        LevelRenderEvents.COLLECT_SUBMITS.register { context ->
-            EventBus.post(RenderWorldEvent(RenderContext(context)))
-            RenderBatcher.flushEarly()
-            RenderBatcher.submitTexts(context)
-        }
+        LevelRenderEvents.COLLECT_SUBMITS.register { context -> EventBus.post(RenderWorldEvent(RenderContext(context))) }
         LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register { RenderBatcher.flush() }
+        LevelRenderEvents.END_MAIN.register { RenderBatcher.flushTexts() }
 
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register { _, _ -> EventBus.post(WorldChangeEvent) }
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> EventBus.post(WorldChangeEvent) }

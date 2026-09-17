@@ -300,8 +300,7 @@ object SimonSays: Feature("Simon Says Solver") {
             pos.y + 0.375, pos.z + 0.3125, pos.x + 1.0,
             pos.y + 0.625, pos.z + 0.6875, color,
             outline = outline.value,
-            phase = phase.value,
-            early = buttonNumbers.value
+            phase = phase.value
         )
     }
 

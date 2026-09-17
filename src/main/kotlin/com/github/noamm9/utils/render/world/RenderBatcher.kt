@@ -1,16 +1,18 @@
 package com.github.noamm9.utils.render.world
 
+import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.utils.render.world.batches.*
 import com.mojang.blaze3d.PrimitiveTopology
 import com.mojang.blaze3d.vertex.BufferBuilder
 import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.PoseStack
 import gg.essential.universal.*
 import gg.essential.universal.render.URenderPipeline
 import gg.essential.universal.vertex.*
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.minecraft.client.gui.Font
+import net.minecraft.client.renderer.StagedVertexBuffer
+import net.minecraft.client.renderer.feature.FeatureFrameContext
+import net.minecraft.client.renderer.feature.TextFeatureRenderer
 import net.minecraft.network.chat.Component
 import net.minecraft.util.LightCoordsUtil
 import org.joml.Matrix4f
@@ -19,43 +21,51 @@ import org.joml.Vector3f
 object RenderBatcher {
     private val filledBatches = mutableMapOf<URenderPipeline, FilledBatch>()
     private val lineBatches = mutableMapOf<URenderPipeline, LineBatch>()
-    private val earlyFilledBatches = mutableMapOf<URenderPipeline, FilledBatch>()
-    private val earlyLineBatches = mutableMapOf<URenderPipeline, LineBatch>()
     private val texts = ArrayList<TextRenderState>()
+
+    private val textRenderer = TextFeatureRenderer()
+    private val textVertexBuffer = StagedVertexBuffer({ "NoammAddons Text" }, 1024 * 1024)
 
     val tmpVec = Vector3f()
     val tmpDir = Vector3f()
 
-    fun filledBatch(phase: Boolean, early: Boolean = false): FilledBatch {
-        val pipeline = if (phase) NoammRenderPipelines.FILLED_THROUGH_WALLS else NoammRenderPipelines.FILLED
-        val batches = if (early) earlyFilledBatches else filledBatches
-        return filledBatch(pipeline, UGraphics.DrawMode.TRIANGLES, batches)
-    }
-
-    fun circleBatch(phase: Boolean) = filledBatch(
-        if (phase) NoammRenderPipelines.CIRCLE_FILLED_THROUGH_WALLS else NoammRenderPipelines.CIRCLE_FILLED,
-        UGraphics.DrawMode.TRIANGLE_STRIP,
-        filledBatches
-    )
-
-    fun lineBatch(phase: Boolean, early: Boolean = false): LineBatch {
+    fun filledBatch(phase: Boolean) = filledBatch(if (phase) NoammRenderPipelines.FILLED_THROUGH_WALLS else NoammRenderPipelines.FILLED, UGraphics.DrawMode.TRIANGLES)
+    fun circleBatch(phase: Boolean) = filledBatch(if (phase) NoammRenderPipelines.CIRCLE_FILLED_THROUGH_WALLS else NoammRenderPipelines.CIRCLE_FILLED, UGraphics.DrawMode.TRIANGLE_STRIP)
+    fun lineBatch(phase: Boolean): LineBatch {
         val pipeline = if (phase) NoammRenderPipelines.LINES_THROUGH_WALLS else NoammRenderPipelines.LINES
-        val batches = if (early) earlyLineBatches else lineBatches
-        return batches.getOrPut(pipeline) { LineBatch(pipeline) }
+        return lineBatches.getOrPut(pipeline) { LineBatch(pipeline) }
     }
 
     internal fun addText(matrix: Matrix4f, text: String, xOff: Float, yOff: Float, argb: Int, seeThrough: Boolean) {
         texts.add(TextRenderState(Matrix4f(matrix), text, xOff, yOff, argb, seeThrough))
     }
 
-    internal fun submitTexts(context: LevelRenderContext) {
+    /**
+     * Minecraft 26.2 renders normal submitText nodes before custom geometry.
+     * NoammAddons draws its world overlays later, so submitting text through the
+     * normal collector causes labels to be covered by our own ESP/highlight geometry.
+     *
+     * Render the queued text at END_MAIN instead. NORMAL still respects world depth;
+     * SEE_THROUGH still ignores it, but both are now drawn after NoammAddons geometry.
+     */
+    internal fun flushTexts() {
         if (texts.isEmpty()) return
 
-        for (text in texts) {
-            val poseStack = PoseStack()
-            poseStack.last().pose().set(text.matrix)
-            context.submitNodeCollector().submitText(
-                poseStack,
+        val gameRenderer = mc.gameRenderer
+        val frameContext = FeatureFrameContext(
+            gameRenderer.gameRenderState().optionsRenderState,
+            mc.font,
+            mc.modelManager.blockStateModelSet,
+            mc.blockColors,
+            mc.textureManager,
+            mc.atlasManager,
+            gameRenderer.levelLightmap(),
+            textVertexBuffer
+        )
+
+        val submits = texts.map { text ->
+            TextFeatureRenderer.Submit(
+                text.matrix,
                 text.xOff,
                 text.yOff,
                 Component.literal(text.text).visualOrderText,
@@ -68,24 +78,21 @@ object RenderBatcher {
             )
         }
 
-        texts.clear()
-    }
-
-    internal fun flushEarly() {
-        flushGeometry(earlyFilledBatches, earlyLineBatches)
+        try {
+            textRenderer.prepareGroup(frameContext, submits, false)
+            textVertexBuffer.upload()
+            textRenderer.executeGroup(frameContext, 0, submits, false)
+        } finally {
+            textRenderer.finishExecute(frameContext)
+            textVertexBuffer.endFrame()
+            texts.clear()
+        }
     }
 
     internal fun flush() {
-        flushGeometry(filledBatches, lineBatches)
-    }
+        if (filledBatches.isEmpty() && lineBatches.isEmpty()) return
 
-    private fun flushGeometry(
-        fills: MutableMap<URenderPipeline, FilledBatch>,
-        lines: MutableMap<URenderPipeline, LineBatch>
-    ) {
-        if (fills.isEmpty() && lines.isEmpty()) return
-
-        for (batchData in fills.values) {
+        for (batchData in filledBatches.values) {
             val builder = UBufferBuilder.create(batchData.mode, UGraphics.CommonVertexFormats.POSITION_COLOR)
 
             for (state in batchData.data) {
@@ -97,7 +104,7 @@ object RenderBatcher {
             builder.build()?.drawAndClose(batchData.pipeline) { noScissor() }
         }
 
-        for (batchData in lines.values) {
+        for (batchData in lineBatches.values) {
             val format = DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH
             val backing = ByteBufferBuilder(maxOf(256, batchData.data.size * format.vertexSize))
             try {
@@ -116,13 +123,9 @@ object RenderBatcher {
             }
         }
 
-        fills.clear()
-        lines.clear()
+        filledBatches.clear()
+        lineBatches.clear()
     }
 
-    private fun filledBatch(
-        pipeline: URenderPipeline,
-        mode: UGraphics.DrawMode,
-        batches: MutableMap<URenderPipeline, FilledBatch>
-    ) = batches.getOrPut(pipeline) { FilledBatch(pipeline, mode) }
+    private fun filledBatch(pipeline: URenderPipeline, mode: UGraphics.DrawMode) = filledBatches.getOrPut(pipeline) { FilledBatch(pipeline, mode) }
 }

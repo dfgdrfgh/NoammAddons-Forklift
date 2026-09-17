@@ -217,8 +217,7 @@ object Render3D {
         outline: Boolean = true,
         fill: Boolean = true,
         phase: Boolean = false,
-        lineWidth: Number = 2.5,
-        early: Boolean = false
+        lineWidth: Number = 2.5
     ) {
         if (! outline && ! fill) return
 
@@ -226,14 +225,14 @@ object Render3D {
         matrixStack.translate(camera.pos.reverse())
         val pose = uMatrixStack()
 
-        if (fill) RenderBatcher.filledBatch(phase, early).addFilledBoxVertices(
+        if (fill) RenderBatcher.filledBatch(phase).addFilledBoxVertices(
             pose,
             minX,
             minY, minZ, maxX, maxY, maxZ, fillColor.red / 255f,
             fillColor.green / 255f, fillColor.blue / 255f, fillColor.alpha / 255f
         )
 
-        if (outline) RenderBatcher.lineBatch(phase, early).addLineBoxVertices(
+        if (outline) RenderBatcher.lineBatch(phase).addLineBoxVertices(
             pose,
             minX,
             minY, minZ, maxX, maxY, maxZ, outlineColor.red / 255f,
@@ -250,9 +249,8 @@ object Render3D {
         outline: Boolean = true,
         fill: Boolean = true,
         phase: Boolean = false,
-        lineWidth: Number = 2.5,
-        early: Boolean = false
-    ) = renderBoxBounds(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ, outlineColor, fillColor, outline, fill, phase, lineWidth, early)
+        lineWidth: Number = 2.5
+    ) = renderBoxBounds(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ, outlineColor, fillColor, outline, fill, phase, lineWidth)
 
     fun RenderContext.renderString(
         text: String,
