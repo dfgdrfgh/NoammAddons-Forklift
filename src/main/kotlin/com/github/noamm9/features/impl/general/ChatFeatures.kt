@@ -154,7 +154,7 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             line.content().accept { _, style, codePoint ->
                 if (style != lastStyle) {
                     style.color?.let { textColor ->
-                        ChatFormatting.entries.firstOrNull { it.isColor && it.color == textColor.value }?.let {
+                        ChatFormatting.entries.firstOrNull { TextColor.fromLegacyFormat(it)?.value == textColor.value }?.let {
                             builder.append(it)
                         }
                     }

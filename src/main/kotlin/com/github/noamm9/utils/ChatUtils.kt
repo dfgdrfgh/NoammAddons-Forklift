@@ -145,11 +145,11 @@ object ChatUtils: ISelfInit {
         comp.visit({ style, string ->
             style.color?.let { textColor ->
                 val colorMatch = ChatFormatting.entries.firstOrNull {
-                    it.isColor && it.color == textColor.value
+                    TextColor.fromLegacyFormat(it)?.value == textColor.value
                 }
 
                 if (colorMatch != null) {
-                    sb.append("§${colorMatch.char}")
+                    sb.append(colorMatch.toString())
                 }
             }
 

@@ -25,7 +25,7 @@ object BlockOverlay: Feature() {
     override fun init() {
         LevelRenderEvents.BEFORE_BLOCK_OUTLINE.register { context, blockOutlineContext ->
             if (! enabled) return@register true
-            if (UMinecraft.getSettings().hideGui) return@register true
+            if (UMinecraft.getMinecraft().gui.hud.isHidden) return@register true
             if (hideDuringEtherwarp.value && shouldHide()) return@register false
 
             RenderContext(context).renderBlock(
