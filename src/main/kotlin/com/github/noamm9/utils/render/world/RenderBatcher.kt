@@ -19,24 +19,37 @@ import org.joml.Vector3f
 object RenderBatcher {
     private val filledBatches = mutableMapOf<URenderPipeline, FilledBatch>()
     private val lineBatches = mutableMapOf<URenderPipeline, LineBatch>()
+    private val earlyFilledBatches = mutableMapOf<URenderPipeline, FilledBatch>()
+    private val earlyLineBatches = mutableMapOf<URenderPipeline, LineBatch>()
     private val texts = ArrayList<TextRenderState>()
 
     val tmpVec = Vector3f()
     val tmpDir = Vector3f()
 
-    fun filledBatch(phase: Boolean) = filledBatch(if (phase) NoammRenderPipelines.FILLED_THROUGH_WALLS else NoammRenderPipelines.FILLED, UGraphics.DrawMode.TRIANGLES)
-    fun circleBatch(phase: Boolean) = filledBatch(if (phase) NoammRenderPipelines.CIRCLE_FILLED_THROUGH_WALLS else NoammRenderPipelines.CIRCLE_FILLED, UGraphics.DrawMode.TRIANGLE_STRIP)
-    fun lineBatch(phase: Boolean): LineBatch {
+    fun filledBatch(phase: Boolean, early: Boolean = false): FilledBatch {
+        val pipeline = if (phase) NoammRenderPipelines.FILLED_THROUGH_WALLS else NoammRenderPipelines.FILLED
+        val batches = if (early) earlyFilledBatches else filledBatches
+        return filledBatch(pipeline, UGraphics.DrawMode.TRIANGLES, batches)
+    }
+
+    fun circleBatch(phase: Boolean) = filledBatch(
+        if (phase) NoammRenderPipelines.CIRCLE_FILLED_THROUGH_WALLS else NoammRenderPipelines.CIRCLE_FILLED,
+        UGraphics.DrawMode.TRIANGLE_STRIP,
+        filledBatches
+    )
+
+    fun lineBatch(phase: Boolean, early: Boolean = false): LineBatch {
         val pipeline = if (phase) NoammRenderPipelines.LINES_THROUGH_WALLS else NoammRenderPipelines.LINES
-        return lineBatches.getOrPut(pipeline) { LineBatch(pipeline) }
+        val batches = if (early) earlyLineBatches else lineBatches
+        return batches.getOrPut(pipeline) { LineBatch(pipeline) }
     }
 
     internal fun addText(matrix: Matrix4f, text: String, xOff: Float, yOff: Float, argb: Int, seeThrough: Boolean) {
         texts.add(TextRenderState(Matrix4f(matrix), text, xOff, yOff, argb, seeThrough))
     }
 
-    internal fun flush(context: LevelRenderContext) {
-        if (filledBatches.isEmpty() && lineBatches.isEmpty() && texts.isEmpty()) return
+    internal fun submitTexts(context: LevelRenderContext) {
+        if (texts.isEmpty()) return
 
         for (text in texts) {
             val poseStack = PoseStack()
@@ -55,7 +68,24 @@ object RenderBatcher {
             )
         }
 
-        for (batchData in filledBatches.values) {
+        texts.clear()
+    }
+
+    internal fun flushEarly() {
+        flushGeometry(earlyFilledBatches, earlyLineBatches)
+    }
+
+    internal fun flush() {
+        flushGeometry(filledBatches, lineBatches)
+    }
+
+    private fun flushGeometry(
+        fills: MutableMap<URenderPipeline, FilledBatch>,
+        lines: MutableMap<URenderPipeline, LineBatch>
+    ) {
+        if (fills.isEmpty() && lines.isEmpty()) return
+
+        for (batchData in fills.values) {
             val builder = UBufferBuilder.create(batchData.mode, UGraphics.CommonVertexFormats.POSITION_COLOR)
 
             for (state in batchData.data) {
@@ -67,7 +97,7 @@ object RenderBatcher {
             builder.build()?.drawAndClose(batchData.pipeline) { noScissor() }
         }
 
-        for (batchData in lineBatches.values) {
+        for (batchData in lines.values) {
             val format = DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH
             val backing = ByteBufferBuilder(maxOf(256, batchData.data.size * format.vertexSize))
             try {
@@ -86,10 +116,13 @@ object RenderBatcher {
             }
         }
 
-        filledBatches.clear()
-        lineBatches.clear()
-        texts.clear()
+        fills.clear()
+        lines.clear()
     }
 
-    private fun filledBatch(pipeline: URenderPipeline, mode: UGraphics.DrawMode) = filledBatches.getOrPut(pipeline) { FilledBatch(pipeline, mode) }
+    private fun filledBatch(
+        pipeline: URenderPipeline,
+        mode: UGraphics.DrawMode,
+        batches: MutableMap<URenderPipeline, FilledBatch>
+    ) = batches.getOrPut(pipeline) { FilledBatch(pipeline, mode) }
 }
