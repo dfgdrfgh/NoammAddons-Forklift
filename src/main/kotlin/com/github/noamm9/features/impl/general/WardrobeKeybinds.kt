@@ -76,7 +76,7 @@ object WardrobeKeybinds: Feature("Make it possible to bind armor slots to your k
         register<ContainerEvent.Keyboard> {
             if (! inWardrobeMenu) return@register
             if (System.currentTimeMillis() - lastClick < 300) return@register
-            if (event.key.equalsOneOf(UKeyboard.KEY_ESCAPE, UKeyboard.KEY_E)) return@register
+            if (event.key.equalsOneOf(UKeyboard.KEY_ESCAPE, (mc.options.keyInventory as IKeyMapping).key.value)) return@register
             val index = if (useHotbarBinds.value) hotbarKeyMap[event.key] ?: return@register
             else keybinds.withIndex().find { (_, key) -> key.isDown() }?.index ?: return@register
             val slot = keyMap.getOrNull(index)?.takeUnless { player.containerMenu.getSlot(it).item == ItemStack.EMPTY } ?: return@register
