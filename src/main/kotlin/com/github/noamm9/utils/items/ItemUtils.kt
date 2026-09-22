@@ -15,7 +15,6 @@ import net.minecraft.world.item.component.CustomData
 import net.minecraft.world.item.component.ItemLore
 import kotlin.jvm.optionals.getOrNull
 
-
 object ItemUtils {
     val ItemStack.customData get() = getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
     val ItemStack.lore get() = getOrDefault(DataComponents.LORE, ItemLore.EMPTY).styledLines().map { it.formattedText }
@@ -23,9 +22,9 @@ object ItemUtils {
     val ItemStack.skyblockId: String
         get() {
             if (isEmpty) return ""
+            val name = hoverName.unformattedText
             val customData = customData
             var sbItemID: String? = null
-            val name = hoverName.unformattedText
 
             if (customData.contains("id")) sbItemID = customData.getString("id").getOrNull()?.replace(":", "-")
 
@@ -64,25 +63,26 @@ object ItemUtils {
                 return "POTION-${potion.uppercase()}-$level${if (customData.getBooleanOr("enhanced", false)) "-ENHANCED" else ""}"
             }
 
-            if ((sbItemID == null || sbItemID == "ATTRIBUTE_SHARD") && name.endsWith(" Shard")) {
-                val cleanName = name.removeFormatting().uppercase().remove(" SHARD").replace(" ", "_").remove("_X1")
-                return "SHARD_$cleanName"
+            if (sbItemID == "ATTRIBUTE_SHARD" || (sbItemID == null && (name.contains(" Shard ") || name.endsWith(" Shard")))) {
+                return getShardIdFromName(name)
             }
 
             return sbItemID.orEmpty()
         }
+
+    fun getShardIdFromName(displayName: String): String {
+        val name = displayName.removeFormatting().uppercase()
+            .removeSuffix(" X1")
+            .removeSuffix(" SHARD")
+            .replace(" ", "_")
+        return shardIdOverrides[name] ?: "SHARD_$name"
+    }
 
     fun getSkullTexture(stack: ItemStack): String? {
         if (stack.isEmpty) return null
         val profile = stack.get(DataComponents.PROFILE) ?: return null
         val properties = profile.partialProfile().properties
         return properties["textures"].firstOrNull()?.value
-    }
-
-    fun getSkullId(stack: ItemStack): String? {
-        if (stack.isEmpty) return null
-        val profile = stack.get(DataComponents.PROFILE) ?: return null
-        return profile.partialProfile().id.toString()
     }
 
     fun ItemStack.hasGlint() = get(DataComponents.ENCHANTMENT_GLINT_OVERRIDE) == true
@@ -107,4 +107,24 @@ object ItemUtils {
         rarityCache[item] = rarity
         return rarity
     }
+
+
+    private val shardIdOverrides = mapOf(
+        "BOGGED" to "SHARD_SEA_ARCHER",
+        "LOTUSFISH" to "SHARD_LOTUS_FISH",
+        "INKLING" to "SHARD_NIGHT_SQUID",
+        "LOCH_EMPEROR" to "SHARD_SEA_EMPEROR",
+        "INFERNO_DEMONLORD" to "SHARD_BURNINGSOUL",
+        "END_STONE_PROTECTOR" to "SHARD_ENDSTONE_PROTECTOR",
+        "CINDERBAT" to "SHARD_CINDER_BAT",
+        "BEETLE" to "SHARD_CROPEETLE",
+        "ABYSSAL_LANTERNFISH" to "SHARD_ABYSSAL_LANTERN",
+        "SEASHINE" to "SHARD_SEA_SHINE",
+        "WITHER_SPECTRE" to "SHARD_WITHER_SPECTER",
+        "FIELD_MOUSE" to "SHARD_PEST",
+        "ZEALOT_BRUISER" to "SHARD_BRUISER",
+        "STRIDERSURFER" to "SHARD_STRIDER_SURFER",
+        "EARTHWORM" to "SHARD_TERMITE",
+        "FLIPFLOPPER" to "SHARD_FLIP_FLOPPER"
+    )
 }
