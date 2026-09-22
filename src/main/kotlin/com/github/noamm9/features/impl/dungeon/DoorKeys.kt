@@ -2,9 +2,7 @@ package com.github.noamm9.features.impl.dungeon
 
 import com.github.noamm9.config.types.ColorSetting
 import com.github.noamm9.config.types.ToggleSetting
-import com.github.noamm9.event.impl.MainThreadPacketReceivedEvent
-import com.github.noamm9.event.impl.RenderWorldEvent
-import com.github.noamm9.event.impl.WorldChangeEvent
+import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.ColorUtils.withAlpha
@@ -17,6 +15,10 @@ import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.decoration.ArmorStand
 import java.awt.Color
+
+//#if LEGIT
+//$import com.github.noamm9.utils.render.LegitEntityVisibility
+//#endif
 
 object DoorKeys: Feature("ESP box & Tracer for wither and blood doors.") {
     private val highlightWither by ToggleSetting("Wither Key").section("Keys")
@@ -48,9 +50,8 @@ object DoorKeys: Feature("ESP box & Tracer for wither and blood doors.") {
                     return@register
                 }
 
-                //#if CHEAT
-                //#else
-                //$ if (! player.hasLineOfSight(entity)) return@register
+                //#if LEGIT
+                //$ if (! LegitEntityVisibility.isVisible(player, entity)) return@register
                 //#endif
 
                 event.ctx.renderTracer(entity.renderVec.add(y = 1.7), color, 2)
