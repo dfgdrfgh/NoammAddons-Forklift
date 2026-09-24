@@ -37,7 +37,7 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
     @Unique
     @SuppressWarnings("ConstantValue")
     private StorageOverlayScreen storageOverlay() {
-        if (!((Object) this instanceof ContainerScreen)) return null;
+        if (! ((Object) this instanceof ContainerScreen)) return null;
         return StorageOverlay.activeFor((ContainerScreen) (Object) this);
     }
 
@@ -52,6 +52,11 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
         if (storageOverlay() != null) ci.cancel();
     }
 
+    @Inject(method = "extractTooltip", at = @At("HEAD"), cancellable = true)
+    private void onRenderTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY, CallbackInfo ci) {
+        if (storageOverlay() != null) ci.cancel();
+    }
+
     @Inject(method = "extractCarriedItem", at = @At("HEAD"), cancellable = true)
     private void onRenderCarriedItem(GuiGraphicsExtractor graphics, int mouseX, int mouseY, CallbackInfo ci) {
         StorageOverlayScreen overlay = storageOverlay();
@@ -60,7 +65,7 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
 
     @Inject(method = "extractSlot", at = @At("HEAD"), cancellable = true)
     private void onRenderSlot(GuiGraphicsExtractor graphics, Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
-        if (storageOverlay() != null && !(slot.container instanceof net.minecraft.world.entity.player.Inventory)) ci.cancel();
+        if (storageOverlay() != null && ! (slot.container instanceof net.minecraft.world.entity.player.Inventory)) ci.cancel();
     }
 
     @Inject(method = "hasClickedOutside", at = @At("HEAD"), cancellable = true)
@@ -71,7 +76,7 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
     @Inject(method = "isHovering(Lnet/minecraft/world/inventory/Slot;DD)Z", at = @At("HEAD"), cancellable = true)
     public void onIsHovering(Slot slot, double xm, double ym, CallbackInfoReturnable<Boolean> cir) {
         StorageOverlayScreen overlay = storageOverlay();
-        if (overlay != null) cir.setReturnValue(overlay.isPointOverSlot(slot, this.leftPos, this.topPos, xm, ym));
+        if (overlay != null) cir.setReturnValue(overlay.isPointOverSlot(slot, xm, ym));
     }
 
     @Inject(method = "extractSlotHighlightBack", at = @At("HEAD"))
@@ -79,9 +84,9 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
         StorageOverlayScreen overlay = storageOverlay();
         if (overlay != null) {
             for (Slot slot : menu.slots) {
-                if (!hasRememberedSlots) ((ICoordRememberingSlot) slot).noammaddons_rememberCoords();
-                ((ICoordRememberingSlot) slot).noammaddons_setX(-100000);
-                ((ICoordRememberingSlot) slot).noammaddons_setY(-100000);
+                if (! hasRememberedSlots) ((ICoordRememberingSlot) slot).noammaddons_rememberCoords();
+                ((ICoordRememberingSlot) slot).noammaddons_setX(- 100000);
+                ((ICoordRememberingSlot) slot).noammaddons_setY(- 100000);
             }
             hasRememberedSlots = true;
         } else if (hasRememberedSlots) {
@@ -106,13 +111,17 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
     @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
     public void onMouseDrag(MouseButtonEvent event, double dx, double dy, CallbackInfoReturnable<Boolean> cir) {
         StorageOverlayScreen overlay = storageOverlay();
-        if (overlay != null && overlay.mouseDragged(event.x(), event.y())) cir.setReturnValue(true);
+        if (overlay == null) return;
+        overlay.mouseDragged(event.x(), event.y());
+        cir.setReturnValue(true);
     }
 
     @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
     public void onMouseRelease(MouseButtonEvent event, CallbackInfoReturnable<Boolean> cir) {
         StorageOverlayScreen overlay = storageOverlay();
-        if (overlay != null && overlay.mouseReleased()) cir.setReturnValue(true);
+        if (overlay == null) return;
+        overlay.mouseReleased();
+        cir.setReturnValue(true);
     }
 
     @Inject(method = "mouseScrolled", at = @At("HEAD"), cancellable = true)
